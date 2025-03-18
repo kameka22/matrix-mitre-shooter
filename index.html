@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MITRE Matrix Shooter</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+        overflow: hidden;
+        font-family: "Courier New", Courier, monospace;
+        color: #0f0;
+      }
+      #game-container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        background-color: #111;
+        overflow: hidden;
+      }
+      #starfield {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+      #score {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: #0f0;
+        font-size: 24px;
+        z-index: 102;
+      }
+      #player {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background-color: #0088ff;
+        border-radius: 5px;
+        bottom: 20px;
+        left: calc(50% - 20px);
+        box-shadow: 0 0 10px #00aaff;
+        z-index: 101;
+      }
+      .bullet {
+        position: absolute;
+        width: 6px;
+        height: 15px;
+        background-color: #ff0;
+        border-radius: 3px;
+        box-shadow: 0 0 5px #ff0;
+        z-index: 5;
+      }
+      .enemy {
+        position: absolute;
+        padding: 5px 10px;
+        background-color: rgba(255, 0, 0, 0.2);
+        border: 1px solid #f00;
+        border-radius: 4px;
+        color: #fff;
+        font-size: 14px;
+        text-shadow: 0 0 5px #f00;
+        z-index: 3;
+        box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+      }
+      .particle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        z-index: 2;
+      }
+      #game-over {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #f00;
+        font-size: 48px;
+        text-align: center;
+        display: none;
+        z-index: 100;
+        text-shadow: 0 0 10px #f00;
+      }
+      #restart-btn {
+        margin-top: 20px;
+        padding: 10px 20px;
+        background-color: #0f0;
+        color: #000;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 18px;
+      }
+      #start-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 200;
+      }
+      #start-screen h1 {
+        color: #0f0;
+        font-size: 48px;
+        margin-bottom: 20px;
+        text-shadow: 0 0 10px #0f0;
+      }
+      button {
+        padding: 15px 30px;
+        background-color: #0f0;
+        color: #000;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 20px;
+        transition: all 0.3s;
+      }
+      button:hover {
+        background-color: #0c0;
+        transform: scale(1.05);
+      }
+      .player-setup {
+        margin: 20px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        align-items: center;
+      }
+      .player-input {
+        padding: 10px;
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid #0f0;
+        border-radius: 5px;
+        color: #0f0;
+        font-size: 16px;
+        width: 250px;
+        outline: none;
+      }
+      .player-input::placeholder {
+        color: rgba(0, 255, 0, 0.5);
+      }
+      .color-picker {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #0f0;
+      }
+      .color-input {
+        width: 60px;
+        height: 30px;
+        border: none;
+        border-radius: 5px;
+        background: none;
+        cursor: pointer;
+      }
+      .star {
+        position: absolute;
+        background-color: #fff;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+      .asteroid {
+        position: absolute;
+        background-color: #888;
+        border-radius: 50%;
+        z-index: 4;
+        box-shadow: inset -5px -5px 15px #444, inset 5px 5px 15px #aaa;
+      }
+
+      .shake {
+        animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+      }
+
+      @keyframes shake {
+        10%,
+        90% {
+          transform: translate3d(-1px, 0, 0);
+        }
+        20%,
+        80% {
+          transform: translate3d(2px, 0, 0);
+        }
+        30%,
+        50%,
+        70% {
+          transform: translate3d(-4px, 0, 0);
+        }
+        40%,
+        60% {
+          transform: translate3d(4px, 0, 0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container">
+      <div id="starfield"></div>
+      <div id="score">Score: 0</div>
+      <div id="player"></div>
+      <div id="game-over">
+        GAME OVER
+        <br />
+        <button id="restart-btn">Rejouer</button>
+      </div>
+      <div id="start-screen">
+        <h1>MITRE Matrix Shooter</h1>
+        <div class="player-setup">
+          <input
+            type="text"
+            id="player-name"
+            placeholder="Entrez votre nom"
+            class="player-input"
+          />
+          <div class="color-picker">
+            <label for="player-color">Couleur du vaisseau:</label>
+            <input
+              type="color"
+              id="player-color"
+              value="#0088ff"
+              class="color-input"
+            />
+          </div>
+        </div>
+        <p>
+          Utilisez les flèches pour vous déplacer et la barre d'espace pour
+          tirer
+        </p>
+        <button id="start-btn">Commencer</button>
+        <p>By Erium Team</p>
+      </div>
+    </div>
+
+    <script>
+      // Configuration du jeu
+      const gameConfig = {
+        playerSpeed: 8,
+        bulletSpeed: 10,
+        enemyMinSpeed: 1,
+        enemyMaxSpeed: 3,
+        enemySpawnRate: 1000, // ms
+        maxEnemies: 15,
+        initialLives: 5,
+        verticalBoundary: 100, // limite pour le mouvement vertical
+      };
+
+      const asteroidConfig = {
+        minSize: 20,
+        maxSize: 60,
+        minSpeed: 2,
+        maxSpeed: 5,
+        spawnRate: 3000, // ms
+        maxAsteroids: 5,
+      };
+
+      // Techniques MITRE ATT&CK
+      const mitreTexts = [
+        "Reconnaissance",
+        "Resource Development",
+        "Initial Access",
+        "Execution",
+        "Persistence",
+        "Privilege Escalation",
+        "Defense Evasion",
+        "Credential Access",
+        "Discovery",
+        "Lateral Movement",
+        "Collection",
+        "Command and Control",
+        "Exfiltration",
+        "Impact",
+        "Spearphishing",
+        "Drive-by Compromise",
+        "Supply Chain Compromise",
+        "Trusted Relationship",
+        "Valid Accounts",
+        "External Remote Services",
+        "Exploitation",
+        "Default Credentials",
+        "Brute Force",
+        "Account Manipulation",
+        "Browser Extensions",
+        "BITS Jobs",
+        "Bootkit",
+        "Create Account",
+        "Event Triggered Execution",
+        "Hijack Execution Flow",
+        "Implant Container Image",
+        "Office Template Macros",
+        "Pre-OS Boot",
+        "Scheduled Task/Job",
+        "Server Software Component",
+        "Traffic Signaling",
+        "Valid Accounts",
+        "Abuse Elevation Control Mechanism",
+        "Access Token Manipulation",
+        "Domain Policy Modification",
+        "Escape to Host",
+        "Process Injection",
+        "Rootkit",
+        "Abuse Elevation Control Mechanism",
+        "Access Token Manipulation",
+        "BITS Jobs",
+        "Build Image on Host",
+        "Deobfuscate/Decode Files or Information",
+        "Direct Volume Access",
+        "Domain Policy Modification",
+        "Execution Guardrails",
+        "Exploitation for Defense Evasion",
+        "File and Directory Permissions Modification",
+        "Hide Artifacts",
+        "Hijack Execution Flow",
+        "Impair Defenses",
+        "Indicator Removal",
+        "Indirect Command Execution",
+        "Masquerading",
+        "Modify Authentication Process",
+        "Modify Registry",
+        "Modify System Image",
+        "Network Boundary Bridging",
+        "Obfuscated Files or Information",
+        "Pre-OS Boot",
+        "Process Injection",
+        "Reflective Code Loading",
+        "Rogue Domain Controller",
+        "Rootkit",
+        "Subvert Trust Controls",
+        "Traffic Signaling",
+        "Trusted Developer Utilities Proxy Execution",
+        "Template Injection",
+        "Unused/Unsupported Cloud Regions",
+        "Use Alternate Authentication Material",
+        "Valid Accounts",
+        "Virtualization/Sandbox Evasion",
+        "XSL Script Processing",
+      ];
+
+      // Variables du jeu
+      let player;
+      let playerName = "Joueur";
+      let playerColor = "#0088ff";
+      let bullets = [];
+      let enemies = [];
+      let particles = [];
+      let stars = [];
+      let asteroids = [];
+      let score = 0;
+      let lives = gameConfig.initialLives;
+      let gameRunning = false;
+      let keys = {};
+      let lastEnemySpawn = 0;
+      let lastAsteroidSpawn = 0;
+      let gameContainer;
+      let scoreElement;
+      let gameOverElement;
+      let startScreen;
+
+      // Configuration des étoiles
+      const starConfig = {
+        count: 200,
+        minSpeed: 0.5,
+        maxSpeed: 3,
+        minSize: 1,
+        maxSize: 3,
+      };
+
+      // Initialisation du jeu
+      function initGame() {
+        gameContainer = document.getElementById("game-container");
+        player = document.getElementById("player");
+        scoreElement = document.getElementById("score");
+        gameOverElement = document.getElementById("game-over");
+        startScreen = document.getElementById("start-screen");
+
+        initStarfield(); // Initialiser le champ d'étoiles
+
+        document
+          .getElementById("restart-btn")
+          .addEventListener("click", restartGame);
+        document
+          .getElementById("start-btn")
+          .addEventListener("click", startGame);
+
+        // Écouteurs d'événements
+        document.addEventListener("keydown", (e) => {
+          keys[e.key] = true;
+
+          // Espace pour tirer
+          if (e.key === " " && gameRunning) {
+            createBullet();
+          }
+        });
+
+        document.addEventListener("keyup", (e) => {
+          keys[e.key] = false;
+        });
+
+        // Position initiale du joueur - corriger pour ne passer que x
+        updatePlayerPosition(window.innerWidth / 2 - 20);
+      }
+
+      // Démarrer le jeu
+      function startGame() {
+        const nameInput = document.getElementById("player-name");
+        const colorInput = document.getElementById("player-color");
+
+        playerName = nameInput.value.trim() || "Joueur";
+        playerColor = colorInput.value;
+
+        // Appliquer la couleur au joueur
+        player.style.backgroundColor = playerColor;
+        player.style.boxShadow = `0 0 10px ${playerColor}`;
+
+        startScreen.style.display = "none";
+        gameRunning = true;
+        score = 0;
+        lives = gameConfig.initialLives;
+        updateScore();
+        gameLoop();
+      }
+
+      // Redémarrer le jeu
+      function restartGame() {
+        bullets.forEach((bullet) => bullet.element.remove());
+        enemies.forEach((enemy) => enemy.element.remove());
+        particles.forEach((particle) => particle.element.remove());
+        asteroids.forEach((asteroid) => asteroid.element.remove());
+
+        bullets = [];
+        enemies = [];
+        particles = [];
+        asteroids = [];
+
+        gameOverElement.style.display = "none";
+        updatePlayerPosition(window.innerWidth / 2 - 20);
+        player.style.bottom = "20px";
+
+        startGame();
+      }
+
+      // Mettre à jour la position du joueur
+      function updatePlayerPosition(x, y) {
+        const maxY = window.innerHeight - gameConfig.verticalBoundary;
+        const minY = gameConfig.verticalBoundary;
+
+        player.style.left = `${Math.max(
+          0,
+          Math.min(window.innerWidth - 40, x)
+        )}px`;
+        if (y !== undefined) {
+          const currentY = parseInt(player.style.bottom || "20");
+          const newY = Math.max(minY, Math.min(maxY, currentY + y));
+          player.style.bottom = `${newY}px`;
+        }
+      }
+
+      // Créer une balle
+      function createBullet() {
+        const playerRect = player.getBoundingClientRect();
+        const bulletElement = document.createElement("div");
+        bulletElement.className = "bullet";
+        bulletElement.style.left = `${
+          playerRect.left + playerRect.width / 2 - 3
+        }px`;
+        bulletElement.style.bottom = `${
+          window.innerHeight - playerRect.bottom
+        }px`;
+        gameContainer.appendChild(bulletElement);
+
+        bullets.push({
+          element: bulletElement,
+          x: playerRect.left + playerRect.width / 2 - 3,
+          y: playerRect.top,
+          speed: gameConfig.bulletSpeed,
+        });
+
+        // Son de tir
+        playSound("bullet");
+      }
+
+      // Créer un ennemi
+      function createEnemy() {
+        if (enemies.length >= gameConfig.maxEnemies) return;
+
+        const enemyElement = document.createElement("div");
+        enemyElement.className = "enemy";
+
+        // Sélectionner un texte MITRE aléatoire
+        const text = mitreTexts[Math.floor(Math.random() * mitreTexts.length)];
+        enemyElement.textContent = text;
+
+        // Position aléatoire en haut de l'écran
+        const enemyWidth = text.length * 8 + 20; // Estimer la largeur basée sur le texte
+        const x = Math.random() * (window.innerWidth - enemyWidth);
+        enemyElement.style.left = `${x}px`;
+        enemyElement.style.top = "0px";
+
+        // Couleur aléatoire
+        const hue = Math.floor(Math.random() * 360);
+        enemyElement.style.backgroundColor = `hsla(${hue}, 100%, 40%, 0.2)`;
+        enemyElement.style.borderColor = `hsl(${hue}, 100%, 50%)`;
+        enemyElement.style.color = `hsl(${hue}, 100%, 90%)`;
+        enemyElement.style.textShadow = `0 0 5px hsl(${hue}, 100%, 50%)`;
+        enemyElement.style.boxShadow = `0 0 8px hsla(${hue}, 100%, 50%, 0.5)`;
+
+        gameContainer.appendChild(enemyElement);
+
+        enemies.push({
+          element: enemyElement,
+          x: x,
+          y: 0,
+          width: enemyWidth,
+          height: 30,
+          speed:
+            gameConfig.enemyMinSpeed +
+            Math.random() *
+              (gameConfig.enemyMaxSpeed - gameConfig.enemyMinSpeed),
+          hue: hue,
+        });
+      }
+
+      // Créer des particules d'explosion
+      function createExplosion(x, y, hue) {
+        const particleCount = 20;
+        for (let i = 0; i < particleCount; i++) {
+          const particleElement = document.createElement("div");
+          particleElement.className = "particle";
+          particleElement.style.left = `${x}px`;
+          particleElement.style.top = `${y}px`;
+          particleElement.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
+          gameContainer.appendChild(particleElement);
+
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 1 + Math.random() * 3;
+
+          particles.push({
+            element: particleElement,
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 30 + Math.random() * 20,
+          });
+        }
+      }
+
+      // Mettre à jour le score
+      function updateScore() {
+        scoreElement.textContent = `${playerName} | Score: ${score} | Vies: ${lives}`;
+      }
+
+      // Vérifier les collisions
+      function checkCollisions() {
+        const playerRect = player.getBoundingClientRect();
+
+        // Vérifier les collisions avec les astéroïdes
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+          const asteroid = asteroids[i];
+          const asteroidRect = asteroid.element.getBoundingClientRect();
+
+          if (
+            playerRect.left < asteroidRect.right &&
+            playerRect.right > asteroidRect.left &&
+            playerRect.top < asteroidRect.bottom &&
+            playerRect.bottom > asteroidRect.top
+          ) {
+            // Collision avec un astéroïde
+            lives -= 2;
+            updateScore();
+            shakePlayer();
+            playSound("lose");
+
+            // Supprimer l'astéroïde
+            asteroid.element.remove();
+            asteroids.splice(i, 1);
+
+            if (lives <= 0) {
+              gameOver();
+            }
+            continue;
+          }
+        }
+
+        // Vérifier les collisions bullet-enemy
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const bullet = bullets[i];
+          const bulletRect = bullet.element.getBoundingClientRect();
+
+          for (let j = enemies.length - 1; j >= 0; j--) {
+            const enemy = enemies[j];
+            const enemyRect = enemy.element.getBoundingClientRect();
+
+            if (
+              bulletRect.left < enemyRect.right &&
+              bulletRect.right > enemyRect.left &&
+              bulletRect.top < enemyRect.bottom &&
+              bulletRect.bottom > enemyRect.top
+            ) {
+              // Collision détectée
+              createExplosion(
+                enemy.x + enemy.width / 2,
+                enemy.y + 15,
+                enemy.hue
+              );
+
+              // Supprimer l'ennemi et la balle
+              enemy.element.remove();
+              enemies.splice(j, 1);
+
+              bullet.element.remove();
+              bullets.splice(i, 1);
+
+              // Augmenter le score
+              score += 10;
+              updateScore();
+
+              // Son d'explosion
+              playSound("explosion");
+
+              break;
+            }
+          }
+        }
+
+        // Vérifier si des ennemis atteignent le bas de l'écran
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const enemy = enemies[i];
+          if (enemy.y > window.innerHeight) {
+            // L'ennemi a atteint le bas, perdre une vie
+            lives--;
+            updateScore();
+
+            // Supprimer l'ennemi
+            enemy.element.remove();
+            enemies.splice(i, 1);
+
+            if (lives <= 0) {
+              // Game over
+              gameOver();
+            }
+
+            // Son de perte de vie
+            playSound("lose");
+          }
+        }
+      }
+
+      // Fin du jeu
+      function gameOver() {
+        gameRunning = false;
+        gameOverElement.style.display = "block";
+      }
+
+      // Sons simples
+      function playSound(type) {
+        // Utiliser l'API Web Audio pour générer des sons simples
+        const audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        switch (type) {
+          case "bullet":
+            oscillator.type = "sine";
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(
+              0.01,
+              audioContext.currentTime + 0.1
+            );
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.1);
+            break;
+          case "explosion":
+            oscillator.type = "sawtooth";
+            oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(
+              10,
+              audioContext.currentTime + 0.2
+            );
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(
+              0.01,
+              audioContext.currentTime + 0.2
+            );
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.2);
+            break;
+          case "lose":
+            oscillator.type = "triangle";
+            oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(
+              110,
+              audioContext.currentTime + 0.3
+            );
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(
+              0.01,
+              audioContext.currentTime + 0.3
+            );
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.3);
+            break;
+        }
+      }
+
+      // Créer une étoile
+      function createStar() {
+        const star = document.createElement("div");
+        star.className = "star";
+        const size =
+          Math.random() * (starConfig.maxSize - starConfig.minSize) +
+          starConfig.minSize;
+        star.style.width = `${size}px`;
+        star.style.height = `${size}px`;
+        star.style.opacity = Math.random() * 0.8 + 0.2;
+
+        const starObj = {
+          element: star,
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          speed:
+            Math.random() * (starConfig.maxSpeed - starConfig.minSpeed) +
+            starConfig.minSpeed,
+        };
+
+        star.style.left = `${starObj.x}px`;
+        star.style.top = `${starObj.y}px`;
+
+        document.getElementById("starfield").appendChild(star);
+        return starObj;
+      }
+
+      // Initialiser le champ d'étoiles
+      function initStarfield() {
+        const starfield = document.getElementById("starfield");
+        starfield.innerHTML = "";
+        stars = [];
+
+        for (let i = 0; i < starConfig.count; i++) {
+          stars.push(createStar());
+        }
+      }
+
+      // Mettre à jour les étoiles
+      function updateStars() {
+        stars.forEach((star) => {
+          star.y += star.speed;
+          if (star.y > window.innerHeight) {
+            star.y = -5;
+            star.x = Math.random() * window.innerWidth;
+          }
+          star.element.style.top = `${star.y}px`;
+          star.element.style.left = `${star.x}px`;
+        });
+      }
+
+      // Créer un astéroïde
+      function createAsteroid() {
+        if (asteroids.length >= asteroidConfig.maxAsteroids) return;
+
+        const size =
+          Math.random() * (asteroidConfig.maxSize - asteroidConfig.minSize) +
+          asteroidConfig.minSize;
+        const asteroidElement = document.createElement("div");
+        asteroidElement.className = "asteroid";
+        asteroidElement.style.width = `${size}px`;
+        asteroidElement.style.height = `${size}px`;
+
+        const x = window.innerWidth;
+        const y = Math.random() * (window.innerHeight - size);
+
+        asteroidElement.style.left = `${x}px`;
+        asteroidElement.style.top = `${y}px`;
+
+        gameContainer.appendChild(asteroidElement);
+
+        asteroids.push({
+          element: asteroidElement,
+          x: x,
+          y: y,
+          size: size,
+          speed:
+            Math.random() *
+              (asteroidConfig.maxSpeed - asteroidConfig.minSpeed) +
+            asteroidConfig.minSpeed,
+          rotation: 0,
+          rotationSpeed: (Math.random() - 0.5) * 4,
+        });
+      }
+
+      // Appliquer l'effet de shake au joueur
+      function shakePlayer() {
+        player.classList.add("shake");
+        setTimeout(() => {
+          player.classList.remove("shake");
+        }, 500);
+      }
+
+      // Boucle principale du jeu
+      function gameLoop() {
+        if (!gameRunning) return;
+
+        const now = Date.now();
+
+        updateStars();
+
+        // Déplacer le joueur
+        if (keys["ArrowLeft"]) {
+          const playerRect = player.getBoundingClientRect();
+          updatePlayerPosition(playerRect.left - gameConfig.playerSpeed);
+        }
+        if (keys["ArrowRight"]) {
+          const playerRect = player.getBoundingClientRect();
+          updatePlayerPosition(playerRect.left + gameConfig.playerSpeed);
+        }
+        if (keys["ArrowUp"]) {
+          updatePlayerPosition(undefined, gameConfig.playerSpeed);
+        }
+        if (keys["ArrowDown"]) {
+          updatePlayerPosition(undefined, -gameConfig.playerSpeed);
+        }
+
+        // Mettre à jour les astéroïdes
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+          const asteroid = asteroids[i];
+          asteroid.x -= asteroid.speed;
+          asteroid.rotation += asteroid.rotationSpeed;
+
+          asteroid.element.style.left = `${asteroid.x}px`;
+          asteroid.element.style.transform = `rotate(${asteroid.rotation}deg)`;
+
+          if (asteroid.x + asteroid.size < 0) {
+            asteroid.element.remove();
+            asteroids.splice(i, 1);
+          }
+        }
+
+        // Générer de nouveaux astéroïdes
+        if (now - lastAsteroidSpawn > asteroidConfig.spawnRate) {
+          createAsteroid();
+          lastAsteroidSpawn = now;
+        }
+
+        // Déplacer les balles
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const bullet = bullets[i];
+          bullet.y -= bullet.speed;
+          bullet.element.style.bottom = `${window.innerHeight - bullet.y}px`;
+
+          // Supprimer les balles qui sortent de l'écran
+          if (bullet.y < 0) {
+            bullet.element.remove();
+            bullets.splice(i, 1);
+          }
+        }
+
+        // Déplacer les ennemis
+        for (let i = 0; i < enemies.length; i++) {
+          const enemy = enemies[i];
+          enemy.y += enemy.speed;
+          enemy.element.style.top = `${enemy.y}px`;
+        }
+
+        // Mettre à jour les particules
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const particle = particles[i];
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+          particle.life--;
+
+          particle.element.style.left = `${particle.x}px`;
+          particle.element.style.top = `${particle.y}px`;
+          particle.element.style.opacity = particle.life / 50;
+
+          if (particle.life <= 0) {
+            particle.element.remove();
+            particles.splice(i, 1);
+          }
+        }
+
+        // Générer de nouveaux ennemis
+        if (now - lastEnemySpawn > gameConfig.enemySpawnRate) {
+          createEnemy();
+          lastEnemySpawn = now;
+        }
+
+        // Vérifier les collisions
+        checkCollisions();
+
+        // Continuer la boucle
+        requestAnimationFrame(gameLoop);
+      }
+
+      // Initialiser le jeu au chargement
+      window.addEventListener("load", initGame);
+    </script>
+  </body>
+</html>
